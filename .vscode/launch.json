@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Puppeteer",
+      "program": "${workspaceFolder}/src/services/puppeteerService.js",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--inspect-brk"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
