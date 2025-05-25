@@ -5,6 +5,7 @@ import { SeferListe } from '../models/seferListe';
 import { KullaniciBilgi } from '../models/kullaniciBilgi';
 import { SeatMap } from '../models/seatMap';
 import { getBrowser } from './browserManager';
+import { log } from 'console';
 
 export async function seferleriGetir(seferBilgi: SeferBilgi): Promise<SeferListe> {
   const browser = await getBrowser();
@@ -140,11 +141,15 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
         console.log(buttons.length, ' adet buton bulundu.');
         for (const button of buttons) {
           const text = await button.evaluate(el => el.textContent?.toUpperCase());
-          console.log('Bunlar:', text);
+          console.log('Buton:', text);
           if (text?.includes(secilecekTip)) {
-            await button.click();
-            console.log(`${secilecekTip} tipi koltuk seçildi.`);
-            break;
+            if (await button.isVisible()) {
+              await button.click();
+              console.log(`${secilecekTip} tipi koltuk seçildi.`);
+              break;
+            } else {
+              console.log(`${secilecekTip} tipi buton henüz tıklanabilir değil.`);
+            }
           }
         }
       }
@@ -152,6 +157,7 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
       if (btn) await btn.click();
       await page.waitForSelector('.seferInformationArea', { visible: true });
       const devamButonu = await page.$('.btn.btnContinue');
+
       const expectedUrlPart = "seat-maps/load-by-train-id?environment=dev&userId=1";
       const responsePromise = page.waitForResponse(response =>
         response.url().includes(expectedUrlPart) && response.status() === 200
@@ -162,127 +168,35 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
       const response = await responsePromise;
       const loadByTrainId = await response.json();
       const seatMaps: SeatMap[] = loadByTrainId.seatMaps;
+      let secilenKoltuk: string | null = null;
+      let secilenTrainCarId: number | null = null;
 
       for (const seat of seatMaps) {
         const template = seat.seatMapTemplate;
         const carName = template?.car?.name || 'Bilinmiyor';
         const vagonAciklama = template?.description || 'Açıklama yok';
         const vagonTrainCarId = seat.trainCarId;
-        const bosKoltukSayisi = seat.availableSeatCount ?? 0;
 
-        if (carName.toLowerCase().includes(secilecekTip.toLowerCase())) { // bu satırda I İ muhabbeti patlatabilir dikkat et
+        if (carName.toLocaleLowerCase('tr-TR').includes(secilecekTip.toLocaleLowerCase('tr-TR'))) {
+          const kacinciVagon = vagonAciklama;
           const vagonKoltuklar = seat.seatPrices.map((k: { seatNumber: string }) => k.seatNumber);
           const vagonDoluKoltuklar = seat.allocationSeats.map((k: { seatNumber: string }) => k.seatNumber);
           const vagonBosKoltuklar = vagonKoltuklar.filter(
             koltuk => !vagonDoluKoltuklar.includes(koltuk) && !koltuk.endsWith('H')
           );
 
-          console.log(`${vagonAciklama}, Tip: ${carName}, TrainCarId: ${vagonTrainCarId}, Boş Koltuk Sayısı: ${bosKoltukSayisi}, Boş Koltuklar: ${vagonBosKoltuklar.join(', ')}`);
-
-          const uygunKoltuk = vagonBosKoltuklar[0];
-
-          if (uygunKoltuk) {
-            const payload = {
-              fareFamilyId: 0,
-              fromStationId: 93, // Senin API’nden geliyor
-              gender: kullaniciBilgi.cinsiyet,
-              passengerTypeId: 0,
-              seatNumber: uygunKoltuk,
-              toStationId: 98, // Senin API’nden geliyor
-              totalPassengerCount: 1,
-              trainCarId: vagonTrainCarId
-            };
-
-            console.log('Payload:', payload);
-            // Burada fetch veya başka bir yöntemle payload'ı gönderebilirsin.
-            // await fetch('https://…/select-seat', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' }});
+          if (vagonBosKoltuklar.length > 0) {
+            secilenKoltuk = vagonBosKoltuklar[0];
+            secilenTrainCarId = vagonTrainCarId;
+            console.log(`Bulunduğu Vagon: ${kacinciVagon}, Bulunan koltuk numarası: ${secilenKoltuk}, Vagon ID: ${secilenTrainCarId}`);
+            break;
           }
         }
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      /* for (const seat of seatMaps) {
-        const template = seat.seatMapTemplate;
-        const carName = template?.car?.name || 'Bilinmiyor';
-        const vagonAciklama = template?.description || 'Açıklama yok';
-        const vagonTrainCarId = seat.trainCarId;
-        const bosKoltukSayisi = seat.availableSeatCount ?? 0;
-        const vagonKoltuklar = seat.seatPrices.map((k: { seatNumber: string }) => k.seatNumber);
-        const vagonDoluKoltuklar = seat.allocationSeats.map((k: { seatNumber: string }) => k.seatNumber);
-        const vagonBosKoltuklar = vagonKoltuklar.filter(
-          koltuk => !vagonDoluKoltuklar.includes(koltuk) && !koltuk.endsWith('H')
-        );
-        console.log(`${vagonAciklama}, Tip: ${carName}, TrainCarId: ${vagonTrainCarId}, Boş Koltuk Sayısı: ${bosKoltukSayisi}, Boş Koltuklar: ${vagonBosKoltuklar.join(', ')}`);
-
-        const uygunKoltuk = vagonBosKoltuklar[0];
-        const payload = {
-          fareFamilyId: 0,
-          fromStationId: 93, // Senin API’nden geliyor
-          gender: kullaniciBilgi.cinsiyet,
-          passengerTypeId: 0,
-          seatNumber: uygunKoltuk,
-          toStationId: 98, // Senin API’nden geliyor
-          totalPassengerCount: 1,
-          trainCarId: vagonTrainCarId
-        };
-      } */
     } catch (error) {
       console.error(`Hata oluştu:`, error);
     }
   } else {
     console.log("Uygun koltuk tipi bulunamadı veya seferContainer bulunamadı.");
   }
-
-
-
-
-
-
-
-
-
-
-
-
-  /* await page.waitForSelector('#departureTabArea', { visible: true });
-  const parentDivs = await page.$$('.wagonMap');
-  if (secilecekTip) {
-    try {
-      for (const div of parentDivs) {
-        try {
-          const bosKoltuk = await div.$eval('.textEmptySeat > span', el => el.textContent?.trim());
-          if (bosKoltuk !== '0') {
-            const vagonTipi = await div.$eval('.textWagonType', el => el.textContent?.trim());
-            if (vagonTipi?.toUpperCase().includes(secilecekTip.toUpperCase())) {
-              const btnWagon = await div.$('.btnWagon');
-              if (btnWagon) {
-                console.log(`${secilecekTip} tipi vagon seçildi. ${bosKoltuk} adet boş koltuk mevcut`);
-                await btnWagon.click();
-                break;
-              } else {
-                console.log("'.btnWagon' bulunamadı.");
-              }
-            }
-          }
-        } catch (error) { }
-      }
-    } catch (error) {
-      console.error(`Hata oluştu:`, error);
-    }
-  } */
-
 }

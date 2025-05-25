@@ -5,15 +5,15 @@ const testReserveSeat = async () => {
   const seferBilgi = {
     kalkisYeri: 'ESKİŞEHİR, ESKİŞEHİR',
     varisYeri: 'ANKARA GAR, ANKARA',
-    gidisTarihi: '2025-04-22',
+    gidisTarihi: '2025-05-28',
     seferOncelik: 1
   };
 
   const guncelSefer = {
-    kalkisSaati: '22:30',
-    varisSaati: '23:51',
-    business: '(DOLU)',
-    ekonomi: '(2)'
+    kalkisSaati: '12:34',
+    varisSaati: '13:58',
+    business: '(10)',
+    ekonomi: '(7)'
   };
 
   const kullaniciBilgi = {
