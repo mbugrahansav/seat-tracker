@@ -10,10 +10,10 @@ const testReserveSeat = async () => {
   };
 
   const guncelSefer = {
-    kalkisSaati: '12:34',
-    varisSaati: '13:58',
-    business: '(10)',
-    ekonomi: '(7)'
+    kalkisSaati: '18:19',
+    varisSaati: '19:43',
+    business: '(3)',
+    ekonomi: '(10)'
   };
 
   const kullaniciBilgi = {

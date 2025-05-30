@@ -5,7 +5,6 @@ import { SeferListe } from '../models/seferListe';
 import { KullaniciBilgi } from '../models/kullaniciBilgi';
 import { SeatMap } from '../models/seatMap';
 import { getBrowser } from './browserManager';
-import { log } from 'console';
 
 export async function seferleriGetir(seferBilgi: SeferBilgi): Promise<SeferListe> {
   const browser = await getBrowser();
@@ -168,6 +167,7 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
       const response = await responsePromise;
       const loadByTrainId = await response.json();
       const seatMaps: SeatMap[] = loadByTrainId.seatMaps;
+      let secilenVagon: string | null = null;
       let secilenKoltuk: string | null = null;
       let secilenTrainCarId: number | null = null;
 
@@ -178,7 +178,7 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
         const vagonTrainCarId = seat.trainCarId;
 
         if (carName.toLocaleLowerCase('tr-TR').includes(secilecekTip.toLocaleLowerCase('tr-TR'))) {
-          const kacinciVagon = vagonAciklama;
+          const bulunduguVagon = vagonAciklama;
           const vagonKoltuklar = seat.seatPrices.map((k: { seatNumber: string }) => k.seatNumber);
           const vagonDoluKoltuklar = seat.allocationSeats.map((k: { seatNumber: string }) => k.seatNumber);
           const vagonBosKoltuklar = vagonKoltuklar.filter(
@@ -186,13 +186,74 @@ export async function reserveSeat(seferBilgi: SeferBilgi, guncelSefer: Sefer, ku
           );
 
           if (vagonBosKoltuklar.length > 0) {
+            secilenVagon = bulunduguVagon;
             secilenKoltuk = vagonBosKoltuklar[0];
             secilenTrainCarId = vagonTrainCarId;
-            console.log(`Bulunduğu Vagon: ${kacinciVagon}, Bulunan koltuk numarası: ${secilenKoltuk}, Vagon ID: ${secilenTrainCarId}`);
+            console.log(`Bulunduğu Vagon: ${secilenVagon}, Bulunan koltuk numarası: ${secilenKoltuk}, Vagon ID: ${secilenTrainCarId}`);
             break;
           }
         }
       }
+
+      if (!secilenVagon) throw new Error('secilenVagon null olamaz');
+      if (!secilenKoltuk) throw new Error('secilenVagon null olamaz');
+
+      const vagons = await page.$$('button.btnWagon');
+
+      for (const vagon of vagons) {
+        const spanText = await vagon.$eval('span', el => el.textContent?.trim());
+        const normalizedSpan = spanText?.trim().toLowerCase();
+        console.log(normalizedSpan);
+        const normalizedSecilenVagon = secilenVagon.trim().toLowerCase();
+        console.log(normalizedSecilenVagon);
+        if (normalizedSecilenVagon.includes(normalizedSpan!)) {
+          await vagon.click();
+          console.log(`${spanText} ile ${secilenVagon} eşleşti ve tıklandı.`);
+          break;
+        }
+      }
+
+      const seats = await page.$$('.seatNumber')
+
+      for (const seat of seats) {
+        const normalizedSeat = await seat.evaluate(el => el.textContent?.trim().toLowerCase());;
+        const lowerSecilenKoltuk = secilenKoltuk.toLowerCase();
+        if (normalizedSeat === lowerSecilenKoltuk) {
+          await seat.click();
+          console.log(`${normalizedSeat} ile ${lowerSecilenKoltuk} eşleşti ve tıklandı.`);
+          break
+        }
+      }
+
+      await page.waitForSelector('button.popoverBtn', { timeout: 5000 });
+      const seatGenderButtons = await page.$$('button.popoverBtn')
+
+      let userGender = kullaniciBilgi.cinsiyet === "M" ? "man" : "woman";
+      for (const seatGenderButton of seatGenderButtons) {
+
+        const img = await seatGenderButton.$('img');
+        if (!img) {
+          console.log("img bulunamadı");
+          continue;
+        }
+        const alt = await img.evaluate(el => el.getAttribute('alt'));
+
+        if (alt?.includes(userGender)) {
+          await seatGenderButton.evaluate(el => el.click());
+          console.log("Tıklandı");
+          break;
+        }
+      }
+
+
+
+
+
+
+
+
+
+
     } catch (error) {
       console.error(`Hata oluştu:`, error);
     }
